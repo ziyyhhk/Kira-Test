@@ -1,7 +1,7 @@
 /**
  * Kira Tools – Web Frontend
- * Platforms: YouTube, SoundCloud, Spotify, TikTok, Discord.
- * Demo only for downloads – YouTube can still show real thumbnails via video ID.
+ * Real downloads via public Cobalt API instances (community).
+ * Invalid URLs are rejected. Discord is avatar-only (no full API without a bot).
  */
 
 const $ = (sel) => document.querySelector(sel);
@@ -43,35 +43,44 @@ const themeVeil = $('#theme-veil');
 let currentPlatform = 'youtube';
 let currentInfo = null;
 let selectedQuality = null;
-let lockedFormat = null; // 'mp3' | 'mp4' | null (user chooses)
+let lockedFormat = null;
+
+/* Community Cobalt instances (try in order). Official api.cobalt.tools blocks third-party use. */
+const COBALT_APIS = [
+  'https://cobaltapi.cjs.nz/',
+  'https://api.qwkuns.me/',
+  'https://cobalt-api.lamps-dev.dev/',
+  'https://apicobalt.mgytr.top/',
+  'https://cobaltapi.squair.xyz/',
+];
 
 const PLATFORM_LABELS = {
   youtube: { title: 'Paste YouTube URL', hint: 'Video or short link works' },
   soundcloud: { title: 'Paste SoundCloud URL', hint: 'Track link – audio only (MP3)' },
   spotify: { title: 'Paste Spotify URL', hint: 'Track link – audio only (MP3)' },
   tiktok: { title: 'Paste TikTok URL', hint: 'Video link – MP4 only' },
-  discord: { title: 'Paste Discord User ID or Profile URL', hint: 'User ID or discord.com/users/... – avatar + info only' },
+  discord: { title: 'Paste Discord User ID or Profile URL', hint: 'User ID or discord.com/users/... – avatar only' },
 };
 
 const MOCK_QUALITIES_MP4 = [
-  { label: 'Best Available (Auto)', size: null },
-  { label: '1080p', size: '~45 MB' },
-  { label: '720p', size: '~28 MB' },
-  { label: '480p', size: '~15 MB' },
-  { label: '360p', size: '~8 MB' },
+  { label: 'Best Available (Auto)', value: 'max' },
+  { label: '1080p', value: '1080' },
+  { label: '720p', value: '720' },
+  { label: '480p', value: '480' },
+  { label: '360p', value: '360' },
 ];
 
 const MOCK_QUALITIES_MP3 = [
-  { label: '320 kbps (Highest)', size: null },
-  { label: '256 kbps (High)', size: null },
-  { label: '192 kbps (Standard)', size: null },
-  { label: '128 kbps (Basic)', size: null },
+  { label: '320 kbps (Highest)', value: '320' },
+  { label: '256 kbps (High)', value: '256' },
+  { label: '192 kbps (Standard)', value: '128' },
+  { label: '128 kbps (Basic)', value: '128' },
 ];
 
 const MOCK_TIKTOK = [
-  { label: 'Best Available', size: null },
-  { label: 'No Watermark', size: null },
-  { label: 'With Watermark', size: null },
+  { label: 'Best Available', value: 'max' },
+  { label: 'No Watermark', value: 'max' },
+  { label: 'With Watermark', value: 'max' },
 ];
 
 function initTheme() {
@@ -127,10 +136,38 @@ function detectSourceFromUrl(url) {
   return null;
 }
 
-/** Extract YouTube video ID from common URL formats */
+/** Strict validation – reject garbage URLs */
+function validateUrl(url, platform) {
+  if (!url || url.length < 8) return 'URL is too short or empty.';
+
+  // Must look like a URL (except bare Discord snowflake)
+  if (platform !== 'discord' || !/^\d{17,20}$/.test(url.trim())) {
+    try {
+      const u = new URL(url.startsWith('http') ? url : 'https://' + url);
+      if (!['http:', 'https:'].includes(u.protocol)) return 'URL must start with http:// or https://';
+    } catch {
+      return 'Invalid URL format. Paste a full link.';
+    }
+  }
+
+  const detected = detectSourceFromUrl(url);
+  if (!detected) {
+    return 'Not a supported link. Use YouTube, SoundCloud, Spotify, TikTok, or Discord.';
+  }
+  if (detected !== platform) {
+    return `This looks like a ${detected} link. Select the ${detected} platform (or paste again to auto-switch).`;
+  }
+
+  if (platform === 'youtube' && !extractYouTubeId(url)) {
+    return 'Could not find a YouTube video ID in that URL.';
+  }
+
+  return null; // valid
+}
+
 function extractYouTubeId(url) {
   try {
-    const u = new URL(url);
+    const u = new URL(url.startsWith('http') ? url : 'https://' + url);
     if (u.hostname.includes('youtu.be')) {
       return u.pathname.slice(1).split('/')[0].split('?')[0] || null;
     }
@@ -168,39 +205,30 @@ function setThumbnail(url, square = false) {
   mediaThumb.src = url;
 }
 
-/** Show/hide format picker based on platform */
 function applyFormatRules(platform) {
   const formatOptions = document.querySelector('.format-options');
   const formatTitle = formatSection.querySelector('.panel-title');
 
   if (platform === 'soundcloud' || platform === 'spotify') {
-    // Audio only – force MP3, hide format cards
     lockedFormat = 'mp3';
     formatOptions.classList.add('hidden');
     if (formatTitle) formatTitle.textContent = 'Format: MP3 (Audio Only)';
-    $$('input[name="format"]').forEach((r) => {
-      r.checked = r.value === 'mp3';
-    });
+    $$('input[name="format"]').forEach((r) => { r.checked = r.value === 'mp3'; });
   } else if (platform === 'tiktok') {
     lockedFormat = 'mp4';
     formatOptions.classList.add('hidden');
     if (formatTitle) formatTitle.textContent = 'Format: MP4 (Video)';
-    $$('input[name="format"]').forEach((r) => {
-      r.checked = r.value === 'mp4';
-    });
+    $$('input[name="format"]').forEach((r) => { r.checked = r.value === 'mp4'; });
   } else {
-    // YouTube – user can pick
     lockedFormat = null;
     formatOptions.classList.remove('hidden');
     if (formatTitle) formatTitle.textContent = 'Format';
-    $$('input[name="format"]').forEach((r) => {
-      r.checked = r.value === 'mp4';
-    });
+    $$('input[name="format"]').forEach((r) => { r.checked = r.value === 'mp4'; });
   }
 }
 
 btnFetch.addEventListener('click', async () => {
-  const url = urlInput.value.trim();
+  let url = urlInput.value.trim();
   urlError.classList.add('hidden');
 
   if (!url) {
@@ -209,6 +237,13 @@ btnFetch.addEventListener('click', async () => {
     return;
   }
 
+  // Normalize: add https if missing
+  if (!/^https?:\/\//i.test(url) && !/^\d{17,20}$/.test(url)) {
+    url = 'https://' + url;
+    urlInput.value = url;
+  }
+
+  // Auto-switch platform if URL clearly matches another
   const detected = detectSourceFromUrl(url);
   if (detected && detected !== currentPlatform) {
     $$('.platform-card').forEach((c) => {
@@ -220,11 +255,11 @@ btnFetch.addEventListener('click', async () => {
     urlHint.textContent = meta.hint;
   }
 
-  // Validate platform matches URL when possible
-  if (detected && detected !== currentPlatform) {
-    // already switched above
-  } else if (!detected && currentPlatform !== 'discord') {
-    // allow anyway for demo
+  const err = validateUrl(url, currentPlatform);
+  if (err) {
+    urlError.textContent = err;
+    urlError.classList.remove('hidden');
+    return;
   }
 
   btnFetch.disabled = true;
@@ -236,6 +271,9 @@ btnFetch.addEventListener('click', async () => {
     } else {
       await handleMedia(url);
     }
+  } catch (e) {
+    urlError.textContent = e.message || 'Failed to fetch info.';
+    urlError.classList.remove('hidden');
   } finally {
     btnFetch.disabled = false;
     btnFetch.textContent = 'Fetch Info';
@@ -251,53 +289,36 @@ async function handleMedia(url) {
 
   if (currentPlatform === 'youtube') {
     const id = extractYouTubeId(url);
-    if (id) {
-      thumb = youtubeThumbUrl(id);
-      title = `YouTube video (${id})`;
-      channel = 'YouTube';
-      // Try oEmbed for real title (may fail on CORS in some browsers)
-      try {
-        const oembed = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-        const res = await fetch(oembed);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.title) title = data.title;
-          if (data.author_name) channel = data.author_name;
-          if (data.thumbnail_url) thumb = data.thumbnail_url;
-        }
-      } catch (_) {
-        // CORS or network – keep ID-based title + official thumb
+    if (!id) throw new Error('Invalid YouTube URL – no video ID found.');
+    thumb = youtubeThumbUrl(id);
+    title = `YouTube · ${id}`;
+    channel = 'YouTube';
+    try {
+      const res = await fetch(
+        `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (data.title) title = data.title;
+        if (data.author_name) channel = data.author_name;
+        if (data.thumbnail_url) thumb = data.thumbnail_url;
       }
-    } else {
-      title = 'YouTube link (could not parse video ID)';
-      channel = 'YouTube';
-    }
+    } catch (_) {}
   } else if (currentPlatform === 'soundcloud') {
     title = 'SoundCloud track';
     channel = 'SoundCloud';
     duration = 'Audio';
     square = true;
-    // No public CORS-free cover API – show placeholder icon area
-    thumb = null;
   } else if (currentPlatform === 'spotify') {
     title = 'Spotify track';
     channel = 'Spotify';
     duration = 'Audio';
     square = true;
-    thumb = null;
   } else if (currentPlatform === 'tiktok') {
     title = 'TikTok video';
     channel = 'TikTok';
     duration = 'Video';
-    thumb = null;
   }
-
-  // Show the URL host/path briefly so user knows their link was read
-  let shortUrl = url;
-  try {
-    const u = new URL(url);
-    shortUrl = u.hostname + u.pathname.slice(0, 40);
-  } catch (_) {}
 
   currentInfo = {
     title,
@@ -313,10 +334,8 @@ async function handleMedia(url) {
   videoChannel.textContent = currentInfo.channel;
   videoDuration.textContent = currentInfo.duration;
 
-  if (thumb) {
-    setThumbnail(thumb, square);
-  } else {
-    // Music platforms: show a simple colored placeholder via data URI or hide
+  if (thumb) setThumbnail(thumb, square);
+  else {
     thumbWrap.classList.remove('hidden');
     thumbWrap.classList.toggle('square', square);
     mediaThumb.classList.add('hidden');
@@ -338,6 +357,11 @@ function handleDiscord(input) {
   let userId = input.trim();
   const match = input.match(/discord\.com\/users\/(\d+)/i) || input.match(/(\d{17,20})/);
   if (match) userId = match[1];
+  if (!/^\d{17,20}$/.test(userId)) {
+    urlError.textContent = 'Invalid Discord user ID.';
+    urlError.classList.remove('hidden');
+    return;
+  }
 
   currentInfo = {
     title: `User ${userId}`,
@@ -347,11 +371,7 @@ function handleDiscord(input) {
     url: input,
     platform: 'discord',
     userId,
-    username: 'Unknown',
-    discriminator: '0000',
     avatarUrl: `https://cdn.discordapp.com/embed/avatars/${parseInt(userId.slice(-1), 10) % 5}.png`,
-    createdAt: '—',
-    bot: false,
   };
 
   videoTitle.textContent = currentInfo.title;
@@ -364,8 +384,7 @@ function handleDiscord(input) {
   discordAvatarWrap.classList.remove('hidden');
   discordExtra.innerHTML = `
     <div><strong>User ID:</strong> ${currentInfo.userId}</div>
-    <div><strong>Avatar:</strong> default (demo – no live API)</div>
-    <p class="hint" style="margin-top:0.5rem">Full username/avatar needs a backend or Discord bot token.</p>
+    <div>Default avatar shown (live profile needs a Discord bot).</div>
   `;
   discordExtra.classList.remove('hidden');
 
@@ -380,13 +399,9 @@ function renderQualities() {
   let list;
   const format = lockedFormat || document.querySelector('input[name="format"]:checked')?.value || 'mp4';
 
-  if (currentPlatform === 'tiktok') {
-    list = MOCK_TIKTOK;
-  } else if (format === 'mp3' || currentPlatform === 'soundcloud' || currentPlatform === 'spotify') {
-    list = MOCK_QUALITIES_MP3;
-  } else {
-    list = MOCK_QUALITIES_MP4;
-  }
+  if (currentPlatform === 'tiktok') list = MOCK_TIKTOK;
+  else if (format === 'mp3' || currentPlatform === 'soundcloud' || currentPlatform === 'spotify') list = MOCK_QUALITIES_MP3;
+  else list = MOCK_QUALITIES_MP4;
 
   qualityList.innerHTML = '';
   list.forEach((q, i) => {
@@ -396,7 +411,6 @@ function renderQualities() {
     div.innerHTML = `
       <input type="radio" name="quality" value="${i}" ${i === 0 ? 'checked' : ''}>
       <span class="quality-label">${q.label}</span>
-      ${q.size ? `<span class="quality-size">${q.size}</span>` : ''}
     `;
     div.addEventListener('click', () => {
       $$('.quality-item').forEach((el) => el.classList.remove('selected'));
@@ -416,37 +430,136 @@ $$('input[name="format"]').forEach((radio) => {
 
 btnBack.addEventListener('click', () => showStep(stepUrl));
 
-btnDownload.addEventListener('click', () => {
+/** Call Cobalt API – try multiple instances */
+async function cobaltDownload(url, opts) {
+  const body = {
+    url,
+    filenameStyle: 'pretty',
+    disableMetadata: false,
+    alwaysProxy: true,
+    ...opts,
+  };
+
+  const headers = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  };
+
+  let lastError = 'All download servers failed.';
+
+  for (const api of COBALT_APIS) {
+    try {
+      const res = await fetch(api, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        lastError = data.error?.code || data.text || `Server error ${res.status}`;
+        continue;
+      }
+
+      // Cobalt v10+ responses
+      if (data.status === 'tunnel' || data.status === 'redirect') {
+        if (data.url) return data.url;
+      }
+      if (data.status === 'picker' && data.picker?.length) {
+        return data.picker[0].url || data.picker[0].thumb;
+      }
+      if (data.url) return data.url;
+
+      // Older API shapes
+      if (data.status === 'stream' && data.url) return data.url;
+      if (data.status === 'success' && data.url) return data.url;
+
+      if (data.status === 'error') {
+        lastError = data.error?.code || data.text || 'Download failed';
+        // Don't retry on bad URL
+        if (String(lastError).includes('invalid') || String(lastError).includes('unsupported')) {
+          throw new Error(lastError);
+        }
+        continue;
+      }
+
+      lastError = data.text || data.status || 'Unexpected response';
+    } catch (e) {
+      if (e.message && (e.message.includes('invalid') || e.message.includes('unsupported'))) {
+        throw e;
+      }
+      lastError = e.message || 'Network error';
+    }
+  }
+
+  throw new Error(lastError);
+}
+
+btnDownload.addEventListener('click', async () => {
   if (!currentInfo || !selectedQuality) return;
 
   showStep(stepProgress);
-  const fmt = (lockedFormat || document.querySelector('input[name="format"]:checked')?.value || 'file').toUpperCase();
-  progressTitle.textContent = `Downloading ${fmt}...`;
-  progressBar.style.width = '0%';
-  progressText.textContent = '0%';
-  progressNote.textContent = '';
+  const fmt = (lockedFormat || document.querySelector('input[name="format"]:checked')?.value || 'mp4').toLowerCase();
+  progressTitle.textContent = 'Starting download...';
+  progressBar.style.width = '15%';
+  progressText.textContent = '15%';
+  progressNote.textContent = 'Contacting download servers...';
   btnAgain.classList.add('hidden');
 
-  let pct = 0;
-  const interval = setInterval(() => {
-    pct += Math.random() * 14 + 5;
-    if (pct >= 100) {
-      pct = 100;
-      clearInterval(interval);
-      progressBar.style.width = '100%';
-      progressText.textContent = '100%';
-      progressTitle.textContent = 'Done!';
-      progressNote.innerHTML = `
-        <strong>Demo mode</strong> – no real file was downloaded.<br>
-        This is a frontend UI only. For real downloads run:<br>
-        <code>python ytdl_ultra.py</code>
-      `;
-      btnAgain.classList.remove('hidden');
-    } else {
+  const opts = {};
+  if (fmt === 'mp3' || currentPlatform === 'soundcloud' || currentPlatform === 'spotify') {
+    opts.downloadMode = 'audio';
+    opts.audioFormat = 'mp3';
+    opts.audioBitrate = selectedQuality.value || '128';
+  } else {
+    opts.downloadMode = 'auto';
+    opts.videoQuality = selectedQuality.value || '1080';
+    opts.youtubeVideoCodec = 'h264';
+  }
+
+  // Fake progress while waiting
+  let pct = 15;
+  const tick = setInterval(() => {
+    if (pct < 70) {
+      pct += 3;
       progressBar.style.width = pct + '%';
-      progressText.textContent = Math.floor(pct) + '%';
+      progressText.textContent = pct + '%';
     }
-  }, 260);
+  }, 400);
+
+  try {
+    const downloadUrl = await cobaltDownload(currentInfo.url, opts);
+    clearInterval(tick);
+    progressBar.style.width = '100%';
+    progressText.textContent = '100%';
+    progressTitle.textContent = 'Download ready!';
+    progressNote.innerHTML = 'Your file should start downloading. If not, <a href="' + downloadUrl + '" target="_blank" rel="noopener">click here</a>.';
+
+    // Trigger download
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.download = '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    btnAgain.classList.remove('hidden');
+  } catch (e) {
+    clearInterval(tick);
+    progressBar.style.width = '0%';
+    progressText.textContent = 'Failed';
+    progressTitle.textContent = 'Download failed';
+    progressNote.innerHTML = `
+      <strong>${e.message || 'Something went wrong'}</strong><br><br>
+      Public download servers can be rate-limited or blocked by YouTube.<br>
+      Try again later, or run the Python script locally:<br>
+      <code>python ytdl_ultra.py</code>
+    `;
+    btnAgain.classList.remove('hidden');
+  }
 });
 
 btnDlAvatar.addEventListener('click', () => {
@@ -456,7 +569,7 @@ btnDlAvatar.addEventListener('click', () => {
 
 btnCopyInfo.addEventListener('click', () => {
   if (!currentInfo) return;
-  const text = `Discord User Info\nUser ID: ${currentInfo.userId}\nAvatar: ${currentInfo.avatarUrl}`;
+  const text = `Discord User ID: ${currentInfo.userId}\nAvatar: ${currentInfo.avatarUrl}`;
   navigator.clipboard.writeText(text).then(() => {
     btnCopyInfo.textContent = 'Copied!';
     setTimeout(() => (btnCopyInfo.textContent = 'Copy User Info'), 1500);
