@@ -1,7 +1,7 @@
 /**
  * YTDL ULTRA – Web Frontend
- * This is a UI recreation of the Python CLI tool.
- * Real downloads require the Python script or a backend with yt-dlp.
+ * Styled like The Broken List. Platforms: YouTube, SoundCloud, Spotify, TikTok, Discord.
+ * Demo only – real downloads need the Python script / backend.
  */
 
 const $ = (sel) => document.querySelector(sel);
@@ -12,6 +12,8 @@ const stepUrl = $('#step-url');
 const stepInfo = $('#step-info');
 const stepProgress = $('#step-progress');
 const urlInput = $('#url-input');
+const urlLabel = $('#url-label');
+const urlHint = $('#url-hint');
 const btnFetch = $('#btn-fetch');
 const urlError = $('#url-error');
 const videoTitle = $('#video-title');
@@ -19,121 +21,263 @@ const videoSource = $('#video-source');
 const videoChannel = $('#video-channel');
 const videoDuration = $('#video-duration');
 const qualityList = $('#quality-list');
+const formatSection = $('#format-section');
+const discordActions = $('#discord-actions');
+const discordAvatarWrap = $('#discord-avatar-wrap');
+const discordAvatar = $('#discord-avatar');
+const discordExtra = $('#discord-extra');
 const btnDownload = $('#btn-download');
 const btnBack = $('#btn-back');
+const btnDlAvatar = $('#btn-dl-avatar');
+const btnCopyInfo = $('#btn-copy-info');
 const progressBar = $('#progress-bar');
 const progressText = $('#progress-text');
 const progressTitle = $('#progress-title');
 const progressNote = $('#progress-note');
 const btnAgain = $('#btn-again');
+const themeToggle = $('#theme-toggle');
+const themeVeil = $('#theme-veil');
 
+let currentPlatform = 'youtube';
 let currentInfo = null;
 let selectedQuality = null;
 
-// Mock data for demo (since we can't call yt-dlp from browser)
+const PLATFORM_LABELS = {
+  youtube: { title: 'Paste YouTube URL', hint: 'Video or short link works' },
+  soundcloud: { title: 'Paste SoundCloud URL', hint: 'Track or playlist link' },
+  spotify: { title: 'Paste Spotify URL', hint: 'Track link – will search YouTube' },
+  tiktok: { title: 'Paste TikTok URL', hint: 'Video link from TikTok' },
+  discord: { title: 'Paste Discord User ID or Profile URL', hint: 'User ID or discord.com/users/... – avatar + info only' },
+};
+
 const MOCK_QUALITIES_MP4 = [
-  { label: 'Best Available (Auto)', size: null, tier: 'high' },
-  { label: '1080p [audio]', size: '~45 MB', tier: 'high' },
-  { label: '720p [audio]', size: '~28 MB', tier: 'mid' },
-  { label: '480p [audio]', size: '~15 MB', tier: 'mid' },
-  { label: '360p [audio]', size: '~8 MB', tier: 'low' },
+  { label: 'Best Available (Auto)', size: null },
+  { label: '1080p', size: '~45 MB' },
+  { label: '720p', size: '~28 MB' },
+  { label: '480p', size: '~15 MB' },
+  { label: '360p', size: '~8 MB' },
 ];
 
 const MOCK_QUALITIES_MP3 = [
-  { label: '320 kbps (Highest)', size: null, tier: 'high' },
-  { label: '256 kbps (High)', size: null, tier: 'high' },
-  { label: '192 kbps (Standard)', size: null, tier: 'mid' },
-  { label: '128 kbps (Basic)', size: null, tier: 'low' },
+  { label: '320 kbps (Highest)', size: null },
+  { label: '256 kbps (High)', size: null },
+  { label: '192 kbps (Standard)', size: null },
+  { label: '128 kbps (Basic)', size: null },
 ];
 
+const MOCK_TIKTOK = [
+  { label: 'Best Available', size: null },
+  { label: 'No Watermark', size: null },
+  { label: 'With Watermark', size: null },
+];
+
+// ── Theme ──
+function initTheme() {
+  const saved = localStorage.getItem('ytdl-theme');
+  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.body.classList.add('dark');
+  }
+}
+
+themeToggle.addEventListener('click', () => {
+  themeVeil.classList.add('theme-veil--in');
+  setTimeout(() => {
+    document.body.classList.toggle('dark');
+    localStorage.setItem('ytdl-theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+    themeVeil.classList.remove('theme-veil--in');
+  }, 180);
+});
+
+// ── Nav ──
+$$('.nav-link').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    $$('.nav-link').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    const page = btn.dataset.page;
+    $$('.page').forEach((p) => p.classList.remove('active'));
+    $(`#page-${page}`).classList.add('active');
+  });
+});
+
+// ── Platform selection ──
+$$('.platform-card').forEach((card) => {
+  card.addEventListener('click', () => {
+    $$('.platform-card').forEach((c) => c.classList.remove('selected'));
+    card.classList.add('selected');
+    currentPlatform = card.dataset.platform;
+    const meta = PLATFORM_LABELS[currentPlatform];
+    urlLabel.textContent = meta.title;
+    urlHint.textContent = meta.hint;
+    urlInput.value = '';
+    urlError.classList.add('hidden');
+    showStep(stepUrl);
+  });
+});
+
 function showStep(step) {
-  $$('.step').forEach(s => s.classList.remove('active'));
+  $$('.step').forEach((s) => s.classList.remove('active'));
   step.classList.add('active');
 }
 
-function detectSource(url) {
+function detectSourceFromUrl(url) {
   const u = url.toLowerCase();
-  if (u.includes('youtube.com') || u.includes('youtu.be')) return 'YouTube';
-  if (u.includes('soundcloud.com')) return 'SoundCloud';
-  if (u.includes('spotify.com')) return 'Spotify';
+  if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+  if (u.includes('soundcloud.com')) return 'soundcloud';
+  if (u.includes('spotify.com')) return 'spotify';
+  if (u.includes('tiktok.com') || u.includes('vm.tiktok.com')) return 'tiktok';
+  if (u.includes('discord.com') || /^\d{17,20}$/.test(url.trim())) return 'discord';
   return null;
 }
 
-function isMusicSource(source) {
-  return source === 'SoundCloud' || source === 'Spotify';
+function isMusicPlatform(p) {
+  return p === 'soundcloud' || p === 'spotify';
 }
 
+// ── Fetch ──
 btnFetch.addEventListener('click', () => {
   const url = urlInput.value.trim();
   urlError.classList.add('hidden');
 
   if (!url) {
-    urlError.textContent = 'Please enter a URL.';
+    urlError.textContent = 'Please enter a URL or ID.';
     urlError.classList.remove('hidden');
     return;
   }
 
-  const source = detectSource(url);
-  if (!source) {
-    urlError.textContent = 'Not a recognized URL. Please provide a YouTube, SoundCloud, or Spotify link.';
-    urlError.classList.remove('hidden');
-    return;
+  // Auto-detect if URL clearly belongs to another platform
+  const detected = detectSourceFromUrl(url);
+  if (detected && detected !== currentPlatform) {
+    // switch platform card
+    $$('.platform-card').forEach((c) => {
+      c.classList.toggle('selected', c.dataset.platform === detected);
+    });
+    currentPlatform = detected;
+    const meta = PLATFORM_LABELS[currentPlatform];
+    urlLabel.textContent = meta.title;
+    urlHint.textContent = meta.hint;
   }
 
-  // Simulate fetch
   btnFetch.disabled = true;
   btnFetch.textContent = 'Fetching...';
 
   setTimeout(() => {
-    // Mock info (in real app this would come from a backend)
-    currentInfo = {
-      title: source === 'Spotify'
-        ? 'Sample Track – Artist Name'
-        : 'Sample Video Title – Demo Mode',
-      source,
-      channel: source === 'YouTube' ? 'Demo Channel' : source === 'SoundCloud' ? 'Demo Artist' : 'Spotify Artist',
-      duration: source === 'YouTube' ? '3m 42s' : '3m 15s',
-      url,
-    };
-
-    videoTitle.textContent = currentInfo.title;
-    videoSource.textContent = currentInfo.source;
-    videoChannel.textContent = currentInfo.channel;
-    videoDuration.textContent = currentInfo.duration;
-
-    // Auto-select MP3 for music sources
-    if (isMusicSource(source)) {
-      $$('input[name="format"]').forEach(r => {
-        r.checked = r.value === 'mp3';
-      });
+    if (currentPlatform === 'discord') {
+      handleDiscord(url);
+    } else {
+      handleMedia(url);
     }
-
-    renderQualities();
-    showStep(stepInfo);
     btnFetch.disabled = false;
     btnFetch.textContent = 'Fetch Info';
-  }, 900);
+  }, 800);
 });
 
+function handleMedia(url) {
+  const titles = {
+    youtube: 'Sample Video Title – Demo Mode',
+    soundcloud: 'Sample Track – SoundCloud Demo',
+    spotify: 'Sample Track – Artist Name',
+    tiktok: 'Sample TikTok Video – @user',
+  };
+
+  currentInfo = {
+    title: titles[currentPlatform] || 'Sample Media',
+    source: currentPlatform.charAt(0).toUpperCase() + currentPlatform.slice(1),
+    channel: currentPlatform === 'youtube' ? 'Demo Channel' : currentPlatform === 'tiktok' ? '@demouser' : 'Demo Artist',
+    duration: currentPlatform === 'tiktok' ? '0m 18s' : '3m 42s',
+    url,
+    platform: currentPlatform,
+  };
+
+  videoTitle.textContent = currentInfo.title;
+  videoSource.textContent = currentInfo.source;
+  videoChannel.textContent = currentInfo.channel;
+  videoDuration.textContent = currentInfo.duration;
+
+  discordAvatarWrap.classList.add('hidden');
+  discordExtra.classList.add('hidden');
+  formatSection.classList.remove('hidden');
+  discordActions.classList.add('hidden');
+  btnDownload.classList.remove('hidden');
+
+  if (isMusicPlatform(currentPlatform)) {
+    $$('input[name="format"]').forEach((r) => {
+      r.checked = r.value === 'mp3';
+    });
+  } else if (currentPlatform === 'tiktok') {
+    $$('input[name="format"]').forEach((r) => {
+      r.checked = r.value === 'mp4';
+    });
+  }
+
+  renderQualities();
+  showStep(stepInfo);
+}
+
+function handleDiscord(input) {
+  // Extract user ID if it's a URL
+  let userId = input.trim();
+  const match = input.match(/discord\.com\/users\/(\d+)/i) || input.match(/(\d{17,20})/);
+  if (match) userId = match[1];
+
+  // Demo Discord user data
+  currentInfo = {
+    title: 'DemoUser#0001',
+    source: 'Discord',
+    channel: `ID: ${userId}`,
+    duration: '',
+    url: input,
+    platform: 'discord',
+    userId,
+    username: 'DemoUser',
+    discriminator: '0001',
+    avatarUrl: `https://cdn.discordapp.com/embed/avatars/${parseInt(userId.slice(-1), 10) % 5}.png`,
+    createdAt: '2020-03-15',
+    bot: false,
+  };
+
+  videoTitle.textContent = currentInfo.title;
+  videoSource.textContent = 'Discord';
+  videoChannel.textContent = currentInfo.channel;
+  videoDuration.textContent = '';
+
+  discordAvatar.src = currentInfo.avatarUrl;
+  discordAvatarWrap.classList.remove('hidden');
+  discordExtra.innerHTML = `
+    <div><strong>Username:</strong> ${currentInfo.username}</div>
+    <div><strong>User ID:</strong> ${currentInfo.userId}</div>
+    <div><strong>Created:</strong> ${currentInfo.createdAt}</div>
+    <div><strong>Bot:</strong> ${currentInfo.bot ? 'Yes' : 'No'}</div>
+  `;
+  discordExtra.classList.remove('hidden');
+
+  formatSection.classList.add('hidden');
+  discordActions.classList.remove('hidden');
+  btnDownload.classList.add('hidden');
+
+  showStep(stepInfo);
+}
+
 function renderQualities() {
-  const format = document.querySelector('input[name="format"]:checked').value;
-  const list = format === 'mp4' ? MOCK_QUALITIES_MP4 : MOCK_QUALITIES_MP3;
+  let list;
+  if (currentPlatform === 'tiktok') {
+    list = MOCK_TIKTOK;
+  } else {
+    const format = document.querySelector('input[name="format"]:checked')?.value || 'mp4';
+    list = format === 'mp4' ? MOCK_QUALITIES_MP4 : MOCK_QUALITIES_MP3;
+  }
 
   qualityList.innerHTML = '';
   list.forEach((q, i) => {
     const div = document.createElement('div');
-    div.className = `quality-item ${q.tier}`;
-    if (i === 0) {
-      div.classList.add('selected');
-      selectedQuality = q;
-    }
+    div.className = 'quality-item' + (i === 0 ? ' selected' : '');
+    if (i === 0) selectedQuality = q;
     div.innerHTML = `
       <input type="radio" name="quality" value="${i}" ${i === 0 ? 'checked' : ''}>
       <span class="quality-label">${q.label}</span>
       ${q.size ? `<span class="quality-size">${q.size}</span>` : ''}
     `;
     div.addEventListener('click', () => {
-      $$('.quality-item').forEach(el => el.classList.remove('selected'));
+      $$('.quality-item').forEach((el) => el.classList.remove('selected'));
       div.classList.add('selected');
       div.querySelector('input').checked = true;
       selectedQuality = q;
@@ -142,29 +286,27 @@ function renderQualities() {
   });
 }
 
-// Re-render qualities when format changes
-$$('input[name="format"]').forEach(radio => {
+$$('input[name="format"]').forEach((radio) => {
   radio.addEventListener('change', renderQualities);
 });
 
-btnBack.addEventListener('click', () => {
-  showStep(stepUrl);
-});
+btnBack.addEventListener('click', () => showStep(stepUrl));
 
+// ── Download (demo) ──
 btnDownload.addEventListener('click', () => {
   if (!currentInfo || !selectedQuality) return;
 
   showStep(stepProgress);
-  progressTitle.textContent = `Downloading ${document.querySelector('input[name="format"]:checked').value.toUpperCase()}...`;
+  const fmt = document.querySelector('input[name="format"]:checked')?.value?.toUpperCase() || 'FILE';
+  progressTitle.textContent = `Downloading ${fmt}...`;
   progressBar.style.width = '0%';
   progressText.textContent = '0%';
   progressNote.textContent = '';
   btnAgain.classList.add('hidden');
 
-  // Simulated progress
   let pct = 0;
   const interval = setInterval(() => {
-    pct += Math.random() * 12 + 4;
+    pct += Math.random() * 14 + 5;
     if (pct >= 100) {
       pct = 100;
       clearInterval(interval);
@@ -173,16 +315,37 @@ btnDownload.addEventListener('click', () => {
       progressTitle.textContent = 'Done!';
       progressNote.innerHTML = `
         <strong>Demo mode</strong> – no real file was downloaded.<br>
-        To actually download, run the Python script:<br>
-        <code>python ytdl_ultra.py</code><br><br>
-        Or deploy this UI with a backend that uses yt-dlp.
+        Run the Python script for actual downloads:<br>
+        <code>python ytdl_ultra.py</code>
       `;
       btnAgain.classList.remove('hidden');
     } else {
       progressBar.style.width = pct + '%';
       progressText.textContent = Math.floor(pct) + '%';
     }
-  }, 280);
+  }, 260);
+});
+
+// Discord avatar download (demo – opens the avatar URL)
+btnDlAvatar.addEventListener('click', () => {
+  if (!currentInfo?.avatarUrl) return;
+  // In a real app this would force-download. Here we open the CDN link.
+  window.open(currentInfo.avatarUrl, '_blank');
+  progressNote.innerHTML = 'Opened avatar URL. Right-click → Save image to download.';
+});
+
+btnCopyInfo.addEventListener('click', () => {
+  if (!currentInfo) return;
+  const text = `Discord User Info
+Username: ${currentInfo.username}#${currentInfo.discriminator}
+User ID: ${currentInfo.userId}
+Avatar: ${currentInfo.avatarUrl}
+Created: ${currentInfo.createdAt}
+Bot: ${currentInfo.bot}`;
+  navigator.clipboard.writeText(text).then(() => {
+    btnCopyInfo.textContent = 'Copied!';
+    setTimeout(() => (btnCopyInfo.textContent = 'Copy User Info'), 1500);
+  });
 });
 
 btnAgain.addEventListener('click', () => {
@@ -192,7 +355,9 @@ btnAgain.addEventListener('click', () => {
   showStep(stepUrl);
 });
 
-// Allow Enter key on URL input
 urlInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') btnFetch.click();
 });
+
+// Init
+initTheme();
