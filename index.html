@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YTDL ULTRA – Web</title>
+  <link rel="stylesheet" href="CSS/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <!-- Banner -->
+    <header class="banner">
+      <div class="banner-box">
+        <div class="banner-title">Y T D L &nbsp; U L T R A</div>
+        <div class="banner-sub">YouTube · SoundCloud · Spotify → MP4 / MP3</div>
+      </div>
+      <p class="version">Web Frontend Recreation</p>
+    </header>
+
+    <!-- Main Card -->
+    <main class="card">
+      <!-- Step 1: URL -->
+      <section id="step-url" class="step active">
+        <h2>Enter URL</h2>
+        <p class="hint">YouTube, SoundCloud or Spotify link</p>
+        <input type="url" id="url-input" placeholder="https://youtube.com/watch?v=... or Spotify / SoundCloud" autocomplete="off">
+        <button id="btn-fetch" class="btn primary">Fetch Info</button>
+        <p id="url-error" class="error hidden"></p>
+      </section>
+
+      <!-- Step 2: Info + Format -->
+      <section id="step-info" class="step">
+        <div class="info-box">
+          <h3 id="video-title">—</h3>
+          <div class="meta">
+            <span id="video-source">—</span>
+            <span id="video-channel">—</span>
+            <span id="video-duration">—</span>
+          </div>
+        </div>
+
+        <h2>Format</h2>
+        <div class="format-options">
+          <label class="format-card">
+            <input type="radio" name="format" value="mp4" checked>
+            <span class="format-label">MP4</span>
+            <span class="format-desc">Video + Audio</span>
+          </label>
+          <label class="format-card">
+            <input type="radio" name="format" value="mp3">
+            <span class="format-label">MP3</span>
+            <span class="format-desc">Audio Only</span>
+          </label>
+        </div>
+
+        <h2>Quality</h2>
+        <div id="quality-list" class="quality-list">
+          <!-- filled by JS -->
+        </div>
+
+        <button id="btn-download" class="btn primary">Download</button>
+        <button id="btn-back" class="btn secondary">← Back</button>
+      </section>
+
+      <!-- Step 3: Progress / Result -->
+      <section id="step-progress" class="step">
+        <h2 id="progress-title">Downloading...</h2>
+        <div class="progress-bar-wrap">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+        <p id="progress-text">0%</p>
+        <p id="progress-note" class="note"></p>
+        <button id="btn-again" class="btn primary hidden">Download Another</button>
+      </section>
+    </main>
+
+    <footer>
+      <p>This is a <strong>frontend recreation</strong> of the CLI tool.</p>
+      <p>Real downloads require the Python script (<code>ytdl_ultra.py</code>) or a backend server.</p>
+      <p class="links">
+        <a href="https://github.com/ziyyhhk/Kira-Test" target="_blank">GitHub Repo</a>
+      </p>
+    </footer>
+  </div>
+
+  <script src="JS/app.js"></script>
+</body>
+</html>
