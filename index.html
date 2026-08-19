@@ -75,7 +75,7 @@
         <div class="panel form-panel">
           <div id="step-url" class="step active">
             <h3 class="panel-title" id="url-label">Paste YouTube URL</h3>
-            <p class="hint" id="url-hint">Video or short link works</p>
+            <p class="hint" id="url-hint">Video or short link</p>
             <input type="text" id="url-input" placeholder="https://..." autocomplete="off" spellcheck="false">
             <p id="url-error" class="error hidden"></p>
             <button id="btn-fetch" class="btn">Fetch Info</button>
@@ -154,15 +154,43 @@
       <div class="page-inner about-inner">
         <div class="panel">
           <h2>Kira Tools</h2>
-          <p>Web frontend recreation of the Python CLI downloader.</p>
-          <p>Supports <strong>YouTube</strong>, <strong>SoundCloud</strong>, <strong>Spotify</strong>, <strong>TikTok</strong> (new) and <strong>Discord</strong> (avatar + info).</p>
-          <p class="note">This is a frontend demo. Real downloads still need the Python script <code>ytdl_ultra.py</code> or a backend with yt-dlp.</p>
-          <p><a href="https://github.com/ziyyhhk/Kira-Test" target="_blank" rel="noopener">GitHub Repository →</a></p>
+          <p>Downloader for YouTube, SoundCloud, Spotify, TikTok & Discord.</p>
+
+          <h3 style="margin-top:1.25rem;margin-bottom:0.5rem">How downloads work</h3>
+          <p>GitHub Pages is <strong>static</strong> — it cannot run yt-dlp. So:</p>
+          <p>1. <strong>Download</strong> opens <a href="https://cobalt.tools/" target="_blank" rel="noopener">cobalt.tools</a> (free, works) and copies your URL.</p>
+          <p>2. Or host your own Cobalt API (free on Railway) and set it below so downloads stay in-app.</p>
+
+          <h3 style="margin-top:1.25rem;margin-bottom:0.5rem">Your Cobalt API (optional)</h3>
+          <p class="hint">Paste your instance URL (e.g. https://your-app.up.railway.app/) then click Save.</p>
+          <input type="text" id="api-input" placeholder="https://your-cobalt-api.example/" style="margin-bottom:0.5rem">
+          <button type="button" id="btn-save-api" class="btn" style="margin-bottom:1rem">Save API URL</button>
+          <p id="api-status" class="hint"></p>
+
+          <h3 style="margin-top:1rem;margin-bottom:0.5rem">Python CLI (most reliable)</h3>
+          <p><code>python ytdl_ultra.py</code> in this repo — works offline with FFmpeg + Deno.</p>
+
+          <p style="margin-top:1rem"><a href="https://github.com/ziyyhhk/Kira-Test" target="_blank" rel="noopener">GitHub Repository →</a></p>
         </div>
       </div>
     </section>
   </main>
 
   <script src="JS/app.js"></script>
+  <script>
+    (function () {
+      const input = document.getElementById('api-input');
+      const status = document.getElementById('api-status');
+      const btn = document.getElementById('btn-save-api');
+      if (!input || !btn) return;
+      input.value = localStorage.getItem('kira-cobalt-api') || '';
+      btn.addEventListener('click', () => {
+        const v = input.value.trim();
+        if (v) localStorage.setItem('kira-cobalt-api', v);
+        else localStorage.removeItem('kira-cobalt-api');
+        status.textContent = v ? 'Saved. Downloads will use your API first.' : 'Cleared. Using cobalt.tools fallback.';
+      });
+    })();
+  </script>
 </body>
 </html>
