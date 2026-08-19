@@ -3,88 +3,158 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YTDL ULTRA – Web</title>
-  <link rel="stylesheet" href="CSS/style.css">
+  <title>YTDL ULTRA</title>
+  <meta name="theme-color" content="#3dbb45">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Chivo+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="CSS/style.css">
 </head>
 <body>
-  <div class="container">
-    <!-- Banner -->
-    <header class="banner">
-      <div class="banner-box">
-        <div class="banner-title">Y T D L &nbsp; U L T R A</div>
-        <div class="banner-sub">YouTube · SoundCloud · Spotify → MP4 / MP3</div>
+  <div class="theme-veil" id="theme-veil"></div>
+
+  <header>
+    <div class="logo">
+      <div class="logo__text">
+        <h2>YTDL ULTRA</h2>
+        <p>Downloader</p>
       </div>
-      <p class="version">Web Frontend Recreation</p>
-    </header>
+    </div>
+    <nav class="nav">
+      <button class="nav-link active" data-page="download">Download</button>
+      <button class="nav-link" data-page="about">About</button>
+    </nav>
+    <button id="theme-toggle" class="theme-btn" title="Toggle dark mode" aria-label="Toggle dark mode">
+      <span class="theme-icon light">☀</span>
+      <span class="theme-icon dark">☾</span>
+    </button>
+  </header>
 
-    <!-- Main Card -->
-    <main class="card">
-      <!-- Step 1: URL -->
-      <section id="step-url" class="step active">
-        <h2>Enter URL</h2>
-        <p class="hint">YouTube, SoundCloud or Spotify link</p>
-        <input type="url" id="url-input" placeholder="https://youtube.com/watch?v=... or Spotify / SoundCloud" autocomplete="off">
-        <button id="btn-fetch" class="btn primary">Fetch Info</button>
-        <p id="url-error" class="error hidden"></p>
-      </section>
+  <main>
+    <!-- DOWNLOAD PAGE -->
+    <section id="page-download" class="page active">
+      <div class="page-inner">
 
-      <!-- Step 2: Info + Format -->
-      <section id="step-info" class="step">
-        <div class="info-box">
-          <h3 id="video-title">—</h3>
-          <div class="meta">
-            <span id="video-source">—</span>
-            <span id="video-channel">—</span>
-            <span id="video-duration">—</span>
+        <!-- Platform selector -->
+        <div class="panel platform-panel">
+          <h3 class="panel-title">Select Platform</h3>
+          <div class="platform-grid">
+            <button class="platform-card selected" data-platform="youtube">
+              <span class="platform-icon">▶</span>
+              <span class="platform-name">YouTube</span>
+            </button>
+            <button class="platform-card" data-platform="soundcloud">
+              <span class="platform-icon">♪</span>
+              <span class="platform-name">SoundCloud</span>
+            </button>
+            <button class="platform-card" data-platform="spotify">
+              <span class="platform-icon">♫</span>
+              <span class="platform-name">Spotify</span>
+            </button>
+            <button class="platform-card" data-platform="tiktok">
+              <span class="platform-icon">✦</span>
+              <span class="platform-name">TikTok</span>
+              <span class="badge new">NEW</span>
+            </button>
+            <button class="platform-card" data-platform="discord">
+              <span class="platform-icon">◎</span>
+              <span class="platform-name">Discord</span>
+              <span class="badge new">NEW</span>
+            </button>
           </div>
         </div>
 
-        <h2>Format</h2>
-        <div class="format-options">
-          <label class="format-card">
-            <input type="radio" name="format" value="mp4" checked>
-            <span class="format-label">MP4</span>
-            <span class="format-desc">Video + Audio</span>
-          </label>
-          <label class="format-card">
-            <input type="radio" name="format" value="mp3">
-            <span class="format-label">MP3</span>
-            <span class="format-desc">Audio Only</span>
-          </label>
+        <!-- Main form panel -->
+        <div class="panel form-panel">
+          <!-- URL step -->
+          <div id="step-url" class="step active">
+            <h3 class="panel-title" id="url-label">Paste YouTube URL</h3>
+            <p class="hint" id="url-hint">Video or short link works</p>
+            <input type="text" id="url-input" placeholder="https://..." autocomplete="off" spellcheck="false">
+            <p id="url-error" class="error hidden"></p>
+            <button id="btn-fetch" class="btn">Fetch Info</button>
+          </div>
+
+          <!-- Info + options step -->
+          <div id="step-info" class="step">
+            <div class="info-box">
+              <div class="info-avatar-wrap hidden" id="discord-avatar-wrap">
+                <img id="discord-avatar" src="" alt="Avatar" class="discord-avatar">
+              </div>
+              <div class="info-text">
+                <h3 id="video-title">—</h3>
+                <div class="meta">
+                  <span id="video-source">—</span>
+                  <span id="video-channel">—</span>
+                  <span id="video-duration">—</span>
+                </div>
+                <div id="discord-extra" class="discord-extra hidden"></div>
+              </div>
+            </div>
+
+            <!-- Format (hidden for Discord) -->
+            <div id="format-section">
+              <h3 class="panel-title">Format</h3>
+              <div class="format-options">
+                <label class="format-card">
+                  <input type="radio" name="format" value="mp4" checked>
+                  <span class="format-label">MP4</span>
+                  <span class="format-desc">Video + Audio</span>
+                </label>
+                <label class="format-card">
+                  <input type="radio" name="format" value="mp3">
+                  <span class="format-label">MP3</span>
+                  <span class="format-desc">Audio Only</span>
+                </label>
+              </div>
+
+              <h3 class="panel-title">Quality</h3>
+              <div id="quality-list" class="quality-list"></div>
+            </div>
+
+            <!-- Discord specific actions -->
+            <div id="discord-actions" class="hidden">
+              <h3 class="panel-title">Actions</h3>
+              <div class="discord-btns">
+                <button id="btn-dl-avatar" class="btn">Download Avatar / PFP</button>
+                <button id="btn-copy-info" class="btn btn-ghost">Copy User Info</button>
+              </div>
+            </div>
+
+            <div class="btn-row">
+              <button id="btn-download" class="btn">Download</button>
+              <button id="btn-back" class="btn btn-ghost">← Back</button>
+            </div>
+          </div>
+
+          <!-- Progress step -->
+          <div id="step-progress" class="step">
+            <h3 class="panel-title" id="progress-title">Downloading...</h3>
+            <div class="progress-bar-wrap">
+              <div id="progress-bar" class="progress-bar"></div>
+            </div>
+            <p id="progress-text" class="progress-text">0%</p>
+            <p id="progress-note" class="note"></p>
+            <button id="btn-again" class="btn hidden">Download Another</button>
+          </div>
         </div>
 
-        <h2>Quality</h2>
-        <div id="quality-list" class="quality-list">
-          <!-- filled by JS -->
+      </div>
+    </section>
+
+    <!-- ABOUT PAGE -->
+    <section id="page-about" class="page">
+      <div class="page-inner about-inner">
+        <div class="panel">
+          <h2>YTDL ULTRA</h2>
+          <p>Web frontend recreation of the Python CLI downloader.</p>
+          <p>Supports <strong>YouTube</strong>, <strong>SoundCloud</strong>, <strong>Spotify</strong>, <strong>TikTok</strong> (new) and <strong>Discord</strong> (avatar + info).</p>
+          <p class="note">This is a frontend demo. Real downloads still need the Python script <code>ytdl_ultra.py</code> or a backend with yt-dlp.</p>
+          <p><a href="https://github.com/ziyyhhk/Kira-Test" target="_blank" rel="noopener">GitHub Repository →</a></p>
         </div>
-
-        <button id="btn-download" class="btn primary">Download</button>
-        <button id="btn-back" class="btn secondary">← Back</button>
-      </section>
-
-      <!-- Step 3: Progress / Result -->
-      <section id="step-progress" class="step">
-        <h2 id="progress-title">Downloading...</h2>
-        <div class="progress-bar-wrap">
-          <div id="progress-bar" class="progress-bar"></div>
-        </div>
-        <p id="progress-text">0%</p>
-        <p id="progress-note" class="note"></p>
-        <button id="btn-again" class="btn primary hidden">Download Another</button>
-      </section>
-    </main>
-
-    <footer>
-      <p>This is a <strong>frontend recreation</strong> of the CLI tool.</p>
-      <p>Real downloads require the Python script (<code>ytdl_ultra.py</code>) or a backend server.</p>
-      <p class="links">
-        <a href="https://github.com/ziyyhhk/Kira-Test" target="_blank">GitHub Repo</a>
-      </p>
-    </footer>
-  </div>
+      </div>
+    </section>
+  </main>
 
   <script src="JS/app.js"></script>
 </body>
