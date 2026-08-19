@@ -4,24 +4,26 @@ Testing Repos .. and you can add more
 
 ## About
 
-- **YTDL ULTRA** – Python CLI tool for downloading from YouTube, SoundCloud, Spotify (+ web UI).
-- Web frontend styled like **The Broken List**, with platform options:
-  - YouTube
-  - SoundCloud
-  - Spotify
-  - **TikTok** (NEW)
-  - **Discord** (NEW – avatar/PFP download + user info)
+**Kira Tools** – web frontend + Python CLI downloader.
+
+Platforms:
+- YouTube
+- SoundCloud
+- Spotify
+- **TikTok** (NEW)
+- **Discord** (NEW – avatar/PFP + user info)
+
+Styled like The Broken List (green theme, light/dark mode).
 
 **Live site:** https://ziyyhhk.github.io/Kira-Test/
 
 ## Structure
 
 ```
-├── index.html             # GitHub Pages entry
+├── index.html             # GitHub Pages entry (Kira Tools UI)
 ├── ytdl_ultra.py          # Original Python CLI script
 ├── CSS/style.css
-├── JS/app.js
-└── HTML/index.html        # (legacy copy)
+└── JS/app.js
 ```
 
 ## Python Script (CLI)
@@ -30,13 +32,13 @@ Testing Repos .. and you can add more
 python ytdl_ultra.py
 ```
 
-**Requirements:** Python 3, FFmpeg, Deno/Node/Bun, packages auto-installed (`yt-dlp`, `colorama`, `mutagen`).
+**Requirements:** Python 3, FFmpeg, Deno/Node/Bun. Packages auto-install (`yt-dlp`, `colorama`, `mutagen`).
 
 ## Web Version
 
-Frontend demo only. Real downloads need the Python script or a backend with yt-dlp.
+Frontend demo. Real downloads need the Python script or a backend with yt-dlp.
 
-Discord mode: paste a User ID or profile URL → shows avatar + basic info, with download/copy actions.
+Default theme is **light**. Use the sun/moon button for dark mode.
 
 ## License
 
