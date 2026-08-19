@@ -53,9 +53,6 @@ init(autoreset=True)
 
 WIDTH = 54
 
-# Hardcoded Deno path from your machine (from "where deno")
-DENO_PATH = r"C:\Users\USER\.deno\bin\deno.exe"
-
 # ── 2. SYSTEM UTILITIES ──
 def disable_quickedit():
     """Disable Windows QuickEdit so clicking the terminal doesn't pause the download."""
@@ -103,19 +100,43 @@ def check_ffmpeg():
         print(Fore.WHITE + " Linux : sudo apt install ffmpeg\n")
         return False
 
+def find_deno_path():
+    """Find Deno executable in a portable way (no hardcoded paths)."""
+    # 1. Already in PATH
+    path = shutil.which("deno")
+    if path:
+        return path
+
+    # 2. Common install locations
+    home = os.path.expanduser("~")
+    candidates = [
+        os.path.join(home, ".deno", "bin", "deno.exe"),          # Windows
+        os.path.join(home, ".deno", "bin", "deno"),              # Unix
+        os.path.join(home, ".cargo", "bin", "deno.exe"),
+        os.path.join(home, ".cargo", "bin", "deno"),
+        r"C:\Users\%USERNAME%\.deno\bin\deno.exe".replace("%USERNAME%", os.environ.get("USERNAME", "")),
+        "/usr/local/bin/deno",
+        "/opt/homebrew/bin/deno",
+    ]
+    for c in candidates:
+        if c and os.path.isfile(c):
+            return c
+    return None
+
 def check_js_runtime():
-    """YouTube requires yt-dlp to run a JS 'challenge solver'.
-    We hardcode your Deno path because PATH is broken for this Python process."""
-    if os.path.isfile(DENO_PATH):
-        print(Fore.GREEN + f" [OK] Deno found at hardcoded path: {DENO_PATH}")
+    """YouTube requires yt-dlp to run a JS 'challenge solver'."""
+    deno = find_deno_path()
+    if deno:
+        print(Fore.GREEN + f" [OK] Deno found: {deno}")
         return True
-    for runtime in ("deno", "node", "bun"):
+
+    for runtime in ("node", "bun"):
         path = shutil.which(runtime)
         if path:
             print(Fore.GREEN + f" [OK] JS runtime found: {runtime} → {path}")
             return True
+
     print(Fore.YELLOW + Style.BRIGHT + "\n [!] No JavaScript runtime (deno/node/bun) found.")
-    print(Fore.YELLOW + " Expected Deno at: " + DENO_PATH)
     print(Fore.YELLOW + " YouTube requires one to unlock most video formats.")
     print(Fore.WHITE + " Deno is what yt-dlp looks for by default.\n")
     system = platform.system()
@@ -181,9 +202,10 @@ def convert_spotify_to_ytsearch(url):
 
 # ── 4. VIDEO / AUDIO PROCESSING ──
 def get_js_runtimes():
-    """Return js_runtimes dict with explicit path so PATH problems never matter."""
-    if os.path.isfile(DENO_PATH):
-        return {"deno": {"path": DENO_PATH}}
+    """Return js_runtimes dict with explicit path when possible."""
+    deno = find_deno_path()
+    if deno:
+        return {"deno": {"path": deno}}
     return {"deno": {}}
 
 def get_video_info(url):
@@ -474,7 +496,7 @@ def main():
                 print(Fore.YELLOW + " Still getting 403 even with Deno?")
                 print(Fore.YELLOW + " 1. Close this terminal completely and open a new one")
                 print(Fore.YELLOW + " 2. Force nightly: pip install -U --pre \"yt-dlp[default]\"")
-                print(Fore.YELLOW + " 3. Make sure the Deno path in the script matches 'where deno'")
+                print(Fore.YELLOW + " 3. Make sure Deno is in your PATH (run: deno --version)")
                 print(Fore.YELLOW + " 4. Try again – YouTube blocks change daily.\n")
         except KeyboardInterrupt:
             print(Fore.YELLOW + "\n\n Cancelled by user.\n")
