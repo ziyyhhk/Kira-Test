@@ -4,44 +4,39 @@ Testing Repos .. and you can add more
 
 ## About
 
-This repository contains:
+- **YTDL ULTRA** – Python CLI tool for downloading from YouTube, SoundCloud, Spotify (+ web UI).
+- Web frontend styled like **The Broken List**, with platform options:
+  - YouTube
+  - SoundCloud
+  - Spotify
+  - **TikTok** (NEW)
+  - **Discord** (NEW – avatar/PFP download + user info)
 
-- **YTDL ULTRA** – a powerful Python CLI tool for downloading from YouTube, SoundCloud, and Spotify (as audio/video).
-- A **web frontend** recreation of the tool (UI only – full downloads still require the Python script or a backend).
+**Live site:** https://ziyyhhk.github.io/Kira-Test/
 
 ## Structure
 
 ```
+├── index.html             # GitHub Pages entry
 ├── ytdl_ultra.py          # Original Python CLI script
-├── HTML/
-│   └── index.html         # Web UI
-├── CSS/
-│   └── style.css          # Styles
-└── JS/
-    └── app.js             # Frontend logic
+├── CSS/style.css
+├── JS/app.js
+└── HTML/index.html        # (legacy copy)
 ```
 
 ## Python Script (CLI)
-
-Run the original tool:
 
 ```bash
 python ytdl_ultra.py
 ```
 
-**Requirements:**
-- Python 3
-- FFmpeg
-- Deno / Node / Bun (for YouTube JS challenges)
-- Packages auto-installed by the script: `yt-dlp`, `colorama`, `mutagen`
+**Requirements:** Python 3, FFmpeg, Deno/Node/Bun, packages auto-installed (`yt-dlp`, `colorama`, `mutagen`).
 
 ## Web Version
 
-Open `HTML/index.html` in a browser (or serve the folder).
+Frontend demo only. Real downloads need the Python script or a backend with yt-dlp.
 
-The web UI recreates the look & flow of the CLI (banner, URL input, format/quality selection, progress simulation).
-
-> **Note:** Actual downloading is not possible purely client-side (yt-dlp requires a Python backend). This is a frontend recreation for demo / future expansion.
+Discord mode: paste a User ID or profile URL → shows avatar + basic info, with download/copy actions.
 
 ## License
 
