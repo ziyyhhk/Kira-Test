@@ -1,5 +1,5 @@
 /**
- * YTDL ULTRA – Web Frontend
+ * Kira Tools – Web Frontend
  * Styled like The Broken List. Platforms: YouTube, SoundCloud, Spotify, TikTok, Discord.
  * Demo only – real downloads need the Python script / backend.
  */
@@ -71,11 +71,14 @@ const MOCK_TIKTOK = [
   { label: 'With Watermark', size: null },
 ];
 
-// ── Theme ──
+// ── Theme (default = light) ──
 function initTheme() {
-  const saved = localStorage.getItem('ytdl-theme');
-  if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+  const saved = localStorage.getItem('kira-theme');
+  // Only apply dark if user explicitly chose it
+  if (saved === 'dark') {
     document.body.classList.add('dark');
+  } else {
+    document.body.classList.remove('dark');
   }
 }
 
@@ -83,7 +86,7 @@ themeToggle.addEventListener('click', () => {
   themeVeil.classList.add('theme-veil--in');
   setTimeout(() => {
     document.body.classList.toggle('dark');
-    localStorage.setItem('ytdl-theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+    localStorage.setItem('kira-theme', document.body.classList.contains('dark') ? 'dark' : 'light');
     themeVeil.classList.remove('theme-veil--in');
   }, 180);
 });
@@ -147,7 +150,6 @@ btnFetch.addEventListener('click', () => {
   // Auto-detect if URL clearly belongs to another platform
   const detected = detectSourceFromUrl(url);
   if (detected && detected !== currentPlatform) {
-    // switch platform card
     $$('.platform-card').forEach((c) => {
       c.classList.toggle('selected', c.dataset.platform === detected);
     });
@@ -214,12 +216,10 @@ function handleMedia(url) {
 }
 
 function handleDiscord(input) {
-  // Extract user ID if it's a URL
   let userId = input.trim();
   const match = input.match(/discord\.com\/users\/(\d+)/i) || input.match(/(\d{17,20})/);
   if (match) userId = match[1];
 
-  // Demo Discord user data
   currentInfo = {
     title: 'DemoUser#0001',
     source: 'Discord',
@@ -326,12 +326,9 @@ btnDownload.addEventListener('click', () => {
   }, 260);
 });
 
-// Discord avatar download (demo – opens the avatar URL)
 btnDlAvatar.addEventListener('click', () => {
   if (!currentInfo?.avatarUrl) return;
-  // In a real app this would force-download. Here we open the CDN link.
   window.open(currentInfo.avatarUrl, '_blank');
-  progressNote.innerHTML = 'Opened avatar URL. Right-click → Save image to download.';
 });
 
 btnCopyInfo.addEventListener('click', () => {
@@ -359,5 +356,5 @@ urlInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') btnFetch.click();
 });
 
-// Init
+// Init – always start light unless user saved dark
 initTheme();
