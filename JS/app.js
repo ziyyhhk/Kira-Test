@@ -1,9 +1,11 @@
 /**
  * Kira Tools
  *
- * Real downloads:
- * - Opens cobalt.tools (works in browser, free) with your URL
- * - Optional: set your own Cobalt API URL in localStorage (key: kira-cobalt-api)
+ * Downloads try (in order):
+ * 1. Your custom Cobalt API (set in About → localStorage)
+ * 2. Public community Cobalt instances
+ * 3. Fallback: open cobalt.tools + copy URL
+ *
  * Discord: downloads default avatar as a real file
  */
 
@@ -47,6 +49,18 @@ let currentPlatform = 'youtube';
 let currentInfo = null;
 let selectedQuality = null;
 let lockedFormat = null;
+
+/* Community Cobalt APIs (no official public free API exists).
+   Some may be offline / rate-limited / require Turnstile – we try several. */
+const COBALT_APIS = [
+  'https://cobalt-api.lamps-dev.dev/',
+  'https://apicobalt.mgytr.top/',
+  'https://cobaltapi.squair.xyz/',
+  'https://api.qwkuns.me/',
+  'https://cobaltapi.cjs.nz/',
+  'https://dog.kittycat.boo/',
+  'https://cobaltapi.kittycat.boo/',
+];
 
 const PLATFORM_LABELS = {
   youtube: { title: 'Paste YouTube URL', hint: 'Video or short link' },
@@ -388,91 +402,150 @@ $$('input[name="format"]').forEach((radio) => {
 
 btnBack.addEventListener('click', () => showStep(stepUrl));
 
-/**
- * Download strategy (static site limits):
- * 1) If user set custom Cobalt API → use it
- * 2) Otherwise open cobalt.tools so the user can download for real (works)
- */
+/** Build the JSON body Cobalt expects */
+function buildCobaltBody() {
+  const fmt = lockedFormat || document.querySelector('input[name="format"]:checked')?.value || 'mp4';
+  const body = {
+    url: currentInfo.url,
+    filenameStyle: 'pretty',
+    alwaysProxy: true,
+  };
+
+  if (fmt === 'mp3' || currentPlatform === 'soundcloud' || currentPlatform === 'spotify') {
+    body.downloadMode = 'audio';
+    body.audioFormat = 'mp3';
+    body.audioBitrate = selectedQuality?.value || '128';
+  } else {
+    body.downloadMode = 'auto';
+    body.videoQuality = selectedQuality?.value || '1080';
+  }
+  return body;
+}
+
+/** Try one Cobalt API endpoint. Returns download URL or throws. */
+async function tryCobaltApi(apiBase, body) {
+  const endpoint = apiBase.replace(/\/?$/, '/');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const msg = data.error?.code || data.text || data.error || `HTTP ${res.status}`;
+      throw new Error(String(msg));
+    }
+
+    // Success statuses from Cobalt API
+    if (data.url && (data.status === 'tunnel' || data.status === 'redirect' || data.status === 'stream')) {
+      return data.url;
+    }
+
+    // Picker (multiple items) – take first
+    if (data.status === 'picker' && Array.isArray(data.picker) && data.picker.length) {
+      return data.picker[0].url;
+    }
+
+    throw new Error(data.error?.code || data.text || 'No download URL returned');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Main download button */
 btnDownload.addEventListener('click', async () => {
   if (!currentInfo) return;
 
   showStep(stepProgress);
   progressTitle.textContent = 'Preparing download...';
-  progressBar.style.width = '30%';
-  progressText.textContent = '30%';
-  progressNote.textContent = '';
+  progressBar.style.width = '15%';
+  progressText.textContent = '15%';
+  progressNote.textContent = 'Trying Cobalt instances...';
   btnAgain.classList.add('hidden');
 
+  const body = buildCobaltBody();
   const customApi = (localStorage.getItem('kira-cobalt-api') || '').trim();
 
+  // 1) Custom API first (user-set)
   if (customApi) {
     progressNote.textContent = 'Using your Cobalt API...';
     try {
-      const fmt = lockedFormat || document.querySelector('input[name="format"]:checked')?.value || 'mp4';
-      const body = {
-        url: currentInfo.url,
-        filenameStyle: 'pretty',
-        alwaysProxy: true,
-      };
-      if (fmt === 'mp3' || currentPlatform === 'soundcloud' || currentPlatform === 'spotify') {
-        body.downloadMode = 'audio';
-        body.audioFormat = 'mp3';
-        body.audioBitrate = selectedQuality?.value || '128';
-      } else {
-        body.downloadMode = 'auto';
-        body.videoQuality = selectedQuality?.value || '1080';
-      }
-
-      const res = await fetch(customApi.replace(/\/?$/, '/'), {
-        method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (data.url && (data.status === 'tunnel' || data.status === 'redirect' || data.status === 'stream')) {
-        progressBar.style.width = '100%';
-        progressText.textContent = '100%';
-        progressTitle.textContent = 'Download ready!';
-        progressNote.innerHTML = 'Starting file download…';
-        const a = document.createElement('a');
-        a.href = data.url;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        btnAgain.classList.remove('hidden');
-        return;
-      }
-      throw new Error(data.error?.code || data.text || 'API did not return a download URL');
+      const dlUrl = await tryCobaltApi(customApi, body);
+      progressBar.style.width = '100%';
+      progressText.textContent = '100%';
+      progressTitle.textContent = 'Download ready!';
+      progressNote.innerHTML = 'Starting file download…';
+      triggerDownload(dlUrl);
+      btnAgain.classList.remove('hidden');
+      return;
     } catch (e) {
-      progressTitle.textContent = 'API failed';
-      progressBar.style.width = '0%';
-      progressText.textContent = 'Failed';
-      progressNote.innerHTML = `<strong>${e.message}</strong><br>Opening cobalt.tools instead…`;
+      progressNote.textContent = `Custom API failed (${e.message}). Trying public instances...`;
     }
   }
 
-  // Fallback that actually works: cobalt.tools website
+  // 2) Try community instances one by one
+  let lastError = null;
+  for (let i = 0; i < COBALT_APIS.length; i++) {
+    const api = COBALT_APIS[i];
+    const pct = 20 + Math.floor((i / COBALT_APIS.length) * 60);
+    progressBar.style.width = pct + '%';
+    progressText.textContent = pct + '%';
+    progressNote.textContent = `Trying instance ${i + 1}/${COBALT_APIS.length}...`;
+
+    try {
+      const dlUrl = await tryCobaltApi(api, body);
+      progressBar.style.width = '100%';
+      progressText.textContent = '100%';
+      progressTitle.textContent = 'Download ready!';
+      progressNote.innerHTML = 'Starting file download…';
+      triggerDownload(dlUrl);
+      btnAgain.classList.remove('hidden');
+      return;
+    } catch (e) {
+      lastError = e;
+      // continue to next
+    }
+  }
+
+  // 3) Fallback – open cobalt.tools
   progressBar.style.width = '100%';
   progressText.textContent = '100%';
   progressTitle.textContent = 'Opening download page…';
   progressNote.innerHTML = `
-    Public APIs need auth, so we open <strong>cobalt.tools</strong> with your link.<br>
-    Paste is already done — pick quality and download there.<br><br>
-    <em>For fully in-app downloads: host your own Cobalt API (free on Railway) and set it in About.</em>
+    Public APIs are busy or blocked right now.<br>
+    Opening <strong>cobalt.tools</strong> with your link copied.<br><br>
+    <em>For reliable in-app downloads: host your own Cobalt (free on Railway / VPS) and paste the API URL in About.</em>
+    ${lastError ? `<br><br><small>Last error: ${lastError.message}</small>` : ''}
   `;
 
-  // cobalt.tools accepts the URL in the page; open and also copy URL for convenience
   try {
     await navigator.clipboard.writeText(currentInfo.url);
   } catch (_) {}
 
   window.open('https://cobalt.tools/', '_blank', 'noopener');
-
   btnAgain.classList.remove('hidden');
 });
+
+function triggerDownload(url) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.download = ''; // hint browser to download when possible
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
 
 // Discord: real file download of avatar
 btnDlAvatar.addEventListener('click', async () => {
