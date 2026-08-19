@@ -1,13 +1,12 @@
 /**
  * Kira Tools – Web Frontend
- * Styled like The Broken List. Platforms: YouTube, SoundCloud, Spotify, TikTok, Discord.
+ * Platforms: YouTube, SoundCloud, Spotify, TikTok, Discord.
  * Demo only – real downloads need the Python script / backend.
  */
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
 
-// Elements
 const stepUrl = $('#step-url');
 const stepInfo = $('#step-info');
 const stepProgress = $('#step-progress');
@@ -26,6 +25,9 @@ const discordActions = $('#discord-actions');
 const discordAvatarWrap = $('#discord-avatar-wrap');
 const discordAvatar = $('#discord-avatar');
 const discordExtra = $('#discord-extra');
+const thumbWrap = $('#thumb-wrap');
+const mediaThumb = $('#media-thumb');
+const thumbPlaceholder = $('#thumb-placeholder');
 const btnDownload = $('#btn-download');
 const btnBack = $('#btn-back');
 const btnDlAvatar = $('#btn-dl-avatar');
@@ -50,6 +52,14 @@ const PLATFORM_LABELS = {
   discord: { title: 'Paste Discord User ID or Profile URL', hint: 'User ID or discord.com/users/... – avatar + info only' },
 };
 
+/* Demo thumbnails (picsum / placeholder – replace with real API later) */
+const DEMO_THUMBS = {
+  youtube: 'https://picsum.photos/seed/kira-yt/480/270',
+  soundcloud: 'https://picsum.photos/seed/kira-sc/300/300',
+  spotify: 'https://picsum.photos/seed/kira-sp/300/300',
+  tiktok: 'https://picsum.photos/seed/kira-tt/270/480',
+};
+
 const MOCK_QUALITIES_MP4 = [
   { label: 'Best Available (Auto)', size: null },
   { label: '1080p', size: '~45 MB' },
@@ -71,10 +81,8 @@ const MOCK_TIKTOK = [
   { label: 'With Watermark', size: null },
 ];
 
-// ── Theme (default = light) ──
 function initTheme() {
   const saved = localStorage.getItem('kira-theme');
-  // Only apply dark if user explicitly chose it
   if (saved === 'dark') {
     document.body.classList.add('dark');
   } else {
@@ -91,7 +99,6 @@ themeToggle.addEventListener('click', () => {
   }, 180);
 });
 
-// ── Nav ──
 $$('.nav-link').forEach((btn) => {
   btn.addEventListener('click', () => {
     $$('.nav-link').forEach((b) => b.classList.remove('active'));
@@ -102,7 +109,6 @@ $$('.nav-link').forEach((btn) => {
   });
 });
 
-// ── Platform selection ──
 $$('.platform-card').forEach((card) => {
   card.addEventListener('click', () => {
     $$('.platform-card').forEach((c) => c.classList.remove('selected'));
@@ -136,7 +142,27 @@ function isMusicPlatform(p) {
   return p === 'soundcloud' || p === 'spotify';
 }
 
-// ── Fetch ──
+function setThumbnail(platform, customUrl) {
+  const url = customUrl || DEMO_THUMBS[platform];
+  if (!url) {
+    thumbWrap.classList.add('hidden');
+    return;
+  }
+  thumbWrap.classList.remove('hidden');
+  thumbWrap.classList.toggle('square', platform === 'spotify' || platform === 'soundcloud');
+  mediaThumb.classList.add('hidden');
+  thumbPlaceholder.classList.remove('hidden');
+  mediaThumb.onload = () => {
+    mediaThumb.classList.remove('hidden');
+    thumbPlaceholder.classList.add('hidden');
+  };
+  mediaThumb.onerror = () => {
+    mediaThumb.classList.add('hidden');
+    thumbPlaceholder.classList.remove('hidden');
+  };
+  mediaThumb.src = url;
+}
+
 btnFetch.addEventListener('click', () => {
   const url = urlInput.value.trim();
   urlError.classList.add('hidden');
@@ -147,7 +173,6 @@ btnFetch.addEventListener('click', () => {
     return;
   }
 
-  // Auto-detect if URL clearly belongs to another platform
   const detected = detectSourceFromUrl(url);
   if (detected && detected !== currentPlatform) {
     $$('.platform-card').forEach((c) => {
@@ -195,6 +220,9 @@ function handleMedia(url) {
   videoChannel.textContent = currentInfo.channel;
   videoDuration.textContent = currentInfo.duration;
 
+  // Show media thumbnail (YouTube 16:9, Spotify/SC square, TikTok portrait-ish)
+  setThumbnail(currentPlatform);
+
   discordAvatarWrap.classList.add('hidden');
   discordExtra.classList.add('hidden');
   formatSection.classList.remove('hidden');
@@ -240,6 +268,8 @@ function handleDiscord(input) {
   videoChannel.textContent = currentInfo.channel;
   videoDuration.textContent = '';
 
+  // Hide media thumb, show Discord avatar
+  thumbWrap.classList.add('hidden');
   discordAvatar.src = currentInfo.avatarUrl;
   discordAvatarWrap.classList.remove('hidden');
   discordExtra.innerHTML = `
@@ -292,7 +322,6 @@ $$('input[name="format"]').forEach((radio) => {
 
 btnBack.addEventListener('click', () => showStep(stepUrl));
 
-// ── Download (demo) ──
 btnDownload.addEventListener('click', () => {
   if (!currentInfo || !selectedQuality) return;
 
@@ -356,5 +385,4 @@ urlInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') btnFetch.click();
 });
 
-// Init – always start light unless user saved dark
 initTheme();
