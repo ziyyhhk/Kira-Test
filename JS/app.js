@@ -49,6 +49,7 @@ let currentPlatform = 'youtube';
 let currentInfo = null;
 let selectedQuality = null;
 let lockedFormat = null;
+let lastDownloadUrl = null;
 
 /* Community Cobalt APIs (no official public free API exists).
    Some may be offline / rate-limited / require Turnstile – we try several. */
@@ -60,6 +61,8 @@ const COBALT_APIS = [
   'https://cobaltapi.cjs.nz/',
   'https://dog.kittycat.boo/',
   'https://cobaltapi.kittycat.boo/',
+  'https://bergung-api.hoffnungfuerdiezukunft.net/',
+  'https://cobalt-omega.wolfy.love/',
 ];
 
 const PLATFORM_LABELS = {
@@ -426,7 +429,7 @@ function buildCobaltBody() {
 async function tryCobaltApi(apiBase, body) {
   const endpoint = apiBase.replace(/\/?$/, '/');
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
+  const timeout = setTimeout(() => controller.abort(), 14000);
 
   try {
     const res = await fetch(endpoint, {
@@ -462,6 +465,64 @@ async function tryCobaltApi(apiBase, body) {
   }
 }
 
+/**
+ * Trigger the actual download.
+ * Cobalt tunnels often ignore the download= attribute on cross-origin links,
+ * so we use multiple methods + always show a manual link.
+ */
+async function triggerDownload(url) {
+  lastDownloadUrl = url;
+
+  // Method 1: open in new tab (most reliable for Cobalt tunnels)
+  const win = window.open(url, '_blank', 'noopener');
+
+  // Method 2: also try hidden <a> click (helps on some browsers)
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 1000);
+  } catch (_) {}
+
+  // Method 3: try blob fetch (only works if the tunnel allows CORS)
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (res.ok) {
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = guessFilename() || 'download';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+    }
+  } catch (_) {
+    // CORS blocked – expected for most tunnels, ignore
+  }
+
+  // Always show a big clickable button so the user can start it manually
+  progressNote.innerHTML = `
+    <p style="margin-bottom:0.75rem">If the download didn't start automatically:</p>
+    <a href="${url}" target="_blank" rel="noopener" class="btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:0.75rem">
+      CLICK HERE TO DOWNLOAD
+    </a>
+    <p style="font-size:0.8rem;opacity:0.8">A new tab may have opened — check your downloads folder or the new tab.</p>
+  `;
+}
+
+function guessFilename() {
+  if (!currentInfo) return null;
+  const title = (currentInfo.title || 'download').replace(/[^\w\s-]/g, '').trim().slice(0, 80);
+  const fmt = lockedFormat || document.querySelector('input[name="format"]:checked')?.value || 'mp4';
+  return `${title}.${fmt === 'mp3' ? 'mp3' : 'mp4'}`;
+}
+
 /** Main download button */
 btnDownload.addEventListener('click', async () => {
   if (!currentInfo) return;
@@ -472,6 +533,7 @@ btnDownload.addEventListener('click', async () => {
   progressText.textContent = '15%';
   progressNote.textContent = 'Trying Cobalt instances...';
   btnAgain.classList.add('hidden');
+  lastDownloadUrl = null;
 
   const body = buildCobaltBody();
   const customApi = (localStorage.getItem('kira-cobalt-api') || '').trim();
@@ -484,8 +546,7 @@ btnDownload.addEventListener('click', async () => {
       progressBar.style.width = '100%';
       progressText.textContent = '100%';
       progressTitle.textContent = 'Download ready!';
-      progressNote.innerHTML = 'Starting file download…';
-      triggerDownload(dlUrl);
+      await triggerDownload(dlUrl);
       btnAgain.classList.remove('hidden');
       return;
     } catch (e) {
@@ -507,8 +568,7 @@ btnDownload.addEventListener('click', async () => {
       progressBar.style.width = '100%';
       progressText.textContent = '100%';
       progressTitle.textContent = 'Download ready!';
-      progressNote.innerHTML = 'Starting file download…';
-      triggerDownload(dlUrl);
+      await triggerDownload(dlUrl);
       btnAgain.classList.remove('hidden');
       return;
     } catch (e) {
@@ -535,17 +595,6 @@ btnDownload.addEventListener('click', async () => {
   window.open('https://cobalt.tools/', '_blank', 'noopener');
   btnAgain.classList.remove('hidden');
 });
-
-function triggerDownload(url) {
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  a.download = ''; // hint browser to download when possible
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
 
 // Discord: real file download of avatar
 btnDlAvatar.addEventListener('click', async () => {
@@ -579,6 +628,7 @@ btnAgain.addEventListener('click', () => {
   currentInfo = null;
   selectedQuality = null;
   lockedFormat = null;
+  lastDownloadUrl = null;
   showStep(stepUrl);
 });
 
