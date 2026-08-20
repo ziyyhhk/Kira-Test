@@ -1,11 +1,9 @@
 /**
  * Kira Tools
  *
- * Downloads try (in order):
- * 1. Your custom Cobalt API (set in About → localStorage)
- * 2. Public community Cobalt instances
- * 3. Fallback: open cobalt.tools + copy URL
- *
+ * Real downloads:
+ * - Opens cobalt.tools with your URL pre-filled (auto-starts)
+ * - Optional: custom Cobalt API URL in localStorage (key: kira-cobalt-api)
  * Discord: downloads default avatar as a real file
  */
 
@@ -49,21 +47,6 @@ let currentPlatform = 'youtube';
 let currentInfo = null;
 let selectedQuality = null;
 let lockedFormat = null;
-let lastDownloadUrl = null;
-
-/* Community Cobalt APIs (no official public free API exists).
-   Some may be offline / rate-limited / require Turnstile – we try several. */
-const COBALT_APIS = [
-  'https://cobalt-api.lamps-dev.dev/',
-  'https://apicobalt.mgytr.top/',
-  'https://cobaltapi.squair.xyz/',
-  'https://api.qwkuns.me/',
-  'https://cobaltapi.cjs.nz/',
-  'https://dog.kittycat.boo/',
-  'https://cobaltapi.kittycat.boo/',
-  'https://bergung-api.hoffnungfuerdiezukunft.net/',
-  'https://cobalt-omega.wolfy.love/',
-];
 
 const PLATFORM_LABELS = {
   youtube: { title: 'Paste YouTube URL', hint: 'Video or short link' },
@@ -405,7 +388,7 @@ $$('input[name="format"]').forEach((radio) => {
 
 btnBack.addEventListener('click', () => showStep(stepUrl));
 
-/** Build the JSON body Cobalt expects */
+/** Build body for custom Cobalt API */
 function buildCobaltBody() {
   const fmt = lockedFormat || document.querySelector('input[name="format"]:checked')?.value || 'mp4';
   const body = {
@@ -425,11 +408,11 @@ function buildCobaltBody() {
   return body;
 }
 
-/** Try one Cobalt API endpoint. Returns download URL or throws. */
-async function tryCobaltApi(apiBase, body) {
+async function tryCustomApi(apiBase) {
   const endpoint = apiBase.replace(/\/?$/, '/');
+  const body = buildCobaltBody();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 14000);
+  const timeout = setTimeout(() => controller.abort(), 12000);
 
   try {
     const res = await fetch(endpoint, {
@@ -441,86 +424,27 @@ async function tryCobaltApi(apiBase, body) {
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-
     const data = await res.json().catch(() => ({}));
 
-    if (!res.ok) {
-      const msg = data.error?.code || data.text || data.error || `HTTP ${res.status}`;
-      throw new Error(String(msg));
-    }
+    if (!res.ok) throw new Error(data.error?.code || data.text || `HTTP ${res.status}`);
 
-    // Success statuses from Cobalt API
     if (data.url && (data.status === 'tunnel' || data.status === 'redirect' || data.status === 'stream')) {
       return data.url;
     }
-
-    // Picker (multiple items) – take first
-    if (data.status === 'picker' && Array.isArray(data.picker) && data.picker.length) {
+    if (data.status === 'picker' && data.picker?.length) {
       return data.picker[0].url;
     }
-
-    throw new Error(data.error?.code || data.text || 'No download URL returned');
+    throw new Error(data.error?.code || data.text || 'No download URL');
   } finally {
     clearTimeout(timeout);
   }
 }
 
-/**
- * Trigger the actual download.
- * Cobalt tunnels often ignore the download= attribute on cross-origin links,
- * so we use multiple methods + always show a manual link.
- */
-async function triggerDownload(url) {
-  lastDownloadUrl = url;
-
-  // Method 1: open in new tab (most reliable for Cobalt tunnels)
-  const win = window.open(url, '_blank', 'noopener');
-
-  // Method 2: also try hidden <a> click (helps on some browsers)
-  try {
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => a.remove(), 1000);
-  } catch (_) {}
-
-  // Method 3: try blob fetch (only works if the tunnel allows CORS)
-  try {
-    const res = await fetch(url, { mode: 'cors' });
-    if (res.ok) {
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = guessFilename() || 'download';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-    }
-  } catch (_) {
-    // CORS blocked – expected for most tunnels, ignore
-  }
-
-  // Always show a big clickable button so the user can start it manually
-  progressNote.innerHTML = `
-    <p style="margin-bottom:0.75rem">If the download didn't start automatically:</p>
-    <a href="${url}" target="_blank" rel="noopener" class="btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:0.75rem">
-      CLICK HERE TO DOWNLOAD
-    </a>
-    <p style="font-size:0.8rem;opacity:0.8">A new tab may have opened — check your downloads folder or the new tab.</p>
-  `;
-}
-
-function guessFilename() {
-  if (!currentInfo) return null;
-  const title = (currentInfo.title || 'download').replace(/[^\w\s-]/g, '').trim().slice(0, 80);
-  const fmt = lockedFormat || document.querySelector('input[name="format"]:checked')?.value || 'mp4';
-  return `${title}.${fmt === 'mp3' ? 'mp3' : 'mp4'}`;
+/** Open cobalt.tools with URL pre-filled (official, works every time) */
+function openCobaltTools(url) {
+  // Official prefill: https://cobalt.tools/#https://...
+  const cobaltUrl = 'https://cobalt.tools/#' + encodeURIComponent(url);
+  window.open(cobaltUrl, '_blank', 'noopener');
 }
 
 /** Main download button */
@@ -528,71 +452,52 @@ btnDownload.addEventListener('click', async () => {
   if (!currentInfo) return;
 
   showStep(stepProgress);
-  progressTitle.textContent = 'Preparing download...';
-  progressBar.style.width = '15%';
-  progressText.textContent = '15%';
-  progressNote.textContent = 'Trying Cobalt instances...';
+  progressBar.style.width = '30%';
+  progressText.textContent = '30%';
+  progressTitle.textContent = 'Preparing...';
+  progressNote.textContent = '';
   btnAgain.classList.add('hidden');
-  lastDownloadUrl = null;
 
-  const body = buildCobaltBody();
   const customApi = (localStorage.getItem('kira-cobalt-api') || '').trim();
 
-  // 1) Custom API first (user-set)
+  // 1) Try user's own Cobalt API first (if set)
   if (customApi) {
     progressNote.textContent = 'Using your Cobalt API...';
     try {
-      const dlUrl = await tryCobaltApi(customApi, body);
+      const dlUrl = await tryCustomApi(customApi);
       progressBar.style.width = '100%';
       progressText.textContent = '100%';
       progressTitle.textContent = 'Download ready!';
-      await triggerDownload(dlUrl);
+      progressNote.innerHTML = `
+        <p style="margin-bottom:0.75rem">If nothing started:</p>
+        <a href="${dlUrl}" target="_blank" rel="noopener" class="btn" style="display:block;text-align:center;text-decoration:none;margin-bottom:0.5rem">
+          CLICK HERE TO DOWNLOAD
+        </a>
+      `;
+      window.open(dlUrl, '_blank', 'noopener');
       btnAgain.classList.remove('hidden');
       return;
     } catch (e) {
-      progressNote.textContent = `Custom API failed (${e.message}). Trying public instances...`;
+      progressNote.textContent = `Custom API failed (${e.message}). Opening cobalt.tools...`;
     }
   }
 
-  // 2) Try community instances one by one
-  let lastError = null;
-  for (let i = 0; i < COBALT_APIS.length; i++) {
-    const api = COBALT_APIS[i];
-    const pct = 20 + Math.floor((i / COBALT_APIS.length) * 60);
-    progressBar.style.width = pct + '%';
-    progressText.textContent = pct + '%';
-    progressNote.textContent = `Trying instance ${i + 1}/${COBALT_APIS.length}...`;
-
-    try {
-      const dlUrl = await tryCobaltApi(api, body);
-      progressBar.style.width = '100%';
-      progressText.textContent = '100%';
-      progressTitle.textContent = 'Download ready!';
-      await triggerDownload(dlUrl);
-      btnAgain.classList.remove('hidden');
-      return;
-    } catch (e) {
-      lastError = e;
-      // continue to next
-    }
-  }
-
-  // 3) Fallback – open cobalt.tools
+  // 2) Official reliable method: cobalt.tools with prefilled URL
   progressBar.style.width = '100%';
   progressText.textContent = '100%';
-  progressTitle.textContent = 'Opening download page…';
+  progressTitle.textContent = 'Opening cobalt.tools';
   progressNote.innerHTML = `
-    Public APIs are busy or blocked right now.<br>
-    Opening <strong>cobalt.tools</strong> with your link copied.<br><br>
-    <em>For reliable in-app downloads: host your own Cobalt (free on Railway / VPS) and paste the API URL in About.</em>
-    ${lastError ? `<br><br><small>Last error: ${lastError.message}</small>` : ''}
+    <strong>Opening cobalt.tools</strong> with your link already filled in.<br><br>
+    The download should start automatically on that page.<br><br>
+    <a href="https://cobalt.tools/#${encodeURIComponent(currentInfo.url)}" target="_blank" rel="noopener" class="btn" style="display:block;text-align:center;text-decoration:none;margin:0.75rem 0;">
+      OPEN COBALT.TOOLS
+    </a>
+    <p style="font-size:0.8rem;opacity:0.85;margin-top:0.5rem">
+      Tip: For fully in-app downloads, host your own Cobalt API (free) and paste it in the About page.
+    </p>
   `;
 
-  try {
-    await navigator.clipboard.writeText(currentInfo.url);
-  } catch (_) {}
-
-  window.open('https://cobalt.tools/', '_blank', 'noopener');
+  openCobaltTools(currentInfo.url);
   btnAgain.classList.remove('hidden');
 });
 
@@ -628,7 +533,6 @@ btnAgain.addEventListener('click', () => {
   currentInfo = null;
   selectedQuality = null;
   lockedFormat = null;
-  lastDownloadUrl = null;
   showStep(stepUrl);
 });
 
