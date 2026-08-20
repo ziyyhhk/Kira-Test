@@ -16,43 +16,37 @@ Styled like The Broken List (green theme, light/dark mode).
 
 ## How downloads work (web)
 
-GitHub Pages is **static** — it cannot run yt-dlp itself.
+GitHub Pages is **static** — it cannot run yt-dlp.
 
-When you click **Download** the site now:
+When you click **Download**:
 
-1. Tries **your custom Cobalt API** (if you set one in the About page)
-2. Tries several **public community Cobalt instances**
-3. If all fail → opens [cobalt.tools](https://cobalt.tools/) and copies your URL to clipboard
+1. If you set a **custom Cobalt API** in About → it tries that first
+2. Otherwise it opens **[cobalt.tools](https://cobalt.tools)** with your URL already filled in (auto-starts the download)
 
-For the most reliable in-app experience, host your own free Cobalt instance (Railway, VPS, etc.) and paste the API URL in **About → Your Cobalt API**.
+This is the only reliable way without hosting your own backend.
 
 ## Structure
 
 ```
 ├── index.html             # GitHub Pages entry (Kira Tools UI)
-├── ytdl_ultra.py          # Python CLI (most reliable)
+├── ytdl_ultra.py          # Python CLI (most reliable offline)
 ├── CSS/style.css
 └── JS/app.js
 ```
 
-## Python CLI (recommended for real downloads)
+## Python CLI (best for real downloads)
 
 ```bash
 python ytdl_ultra.py
 ```
 
-**Requirements:**
-- Python 3
-- FFmpeg (in PATH)
-- Deno / Node / Bun (for YouTube JS challenges)
+**Requirements:** Python 3, FFmpeg, Deno/Node/Bun.  
+Packages auto-install (`yt-dlp`, `colorama`, `mutagen`).
 
-Packages auto-install (`yt-dlp`, `colorama`, `mutagen`). The script now detects Deno portably (no hardcoded Windows path).
-
-## Web version notes
+## Tips
 
 - Default theme is **light**. Use the sun/moon button for dark mode.
-- Real video/audio files come from Cobalt (or the Python script).
-- Discord only downloads the **default** avatar (custom PFPs need a bot token).
+- For fully in-app downloads, host your own Cobalt instance (free on Railway) and paste the API URL in **About**.
 
 ## License
 
